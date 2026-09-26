@@ -509,7 +509,7 @@ void Game::render(SDL_Renderer* r) {
       lr.w = w * 2; lr.h = h * 2;  // board cover art is small; draw it 2x
       if (logo) SDL_RenderCopy(r, logo, nullptr, &lr);
       font::draw(r, "THE COFFEE STAND", 250, 320, 255, 255, 255, 2, 300);
-      font::draw(r, "Click the ORDER BOARD or press ENTER to start",
+      font::draw(r, "Click the ORDER BOARD or press ENTER / SPACE to start",
                  150, 420, 220, 220, 220, 2, 500);
       if (bestScore > 0)
         font::draw(r, "BEST " + std::to_string(bestScore), 300, 380,
@@ -531,7 +531,7 @@ void Game::render(SDL_Renderer* r) {
       std::string line = "FINAL SCORE " + std::to_string(score);
       font::draw(r, line, 280, 390, 255, 235, 120, 3, 300);
       font::draw(r, "BEST " + std::to_string(bestScore), 340, 430, 200, 200, 210, 1, 140);
-      font::draw(r, "Click anywhere or press ENTER to play again",
+      font::draw(r, "Click anywhere or press ENTER / SPACE to play again",
                  140, 460, 220, 220, 220, 2, 520);
       break;
     }
@@ -545,7 +545,7 @@ void Game::render(SDL_Renderer* r) {
     SDL_Rect dim = {0, 0, 800, 600};
     SDL_RenderFillRect(r, &dim);
     font::draw(r, "MENU", 340, 190, 255, 235, 120, 3, 120);
-    font::draw(r, "ESC or ENTER  resume", 250, 270, 230, 230, 230, 2, 300);
+    font::draw(r, "ESC or ENTER / SPACE  resume", 250, 270, 230, 230, 230, 2, 300);
     font::draw(r, "F5  restart this run", 250, 310, 230, 230, 230, 2, 300);
     font::draw(r, "Q  quit to title", 250, 350, 230, 230, 230, 2, 300);
     if (quitPending)
