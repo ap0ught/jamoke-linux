@@ -1,0 +1,37 @@
+# Play a whole 10-customer shift correctly: build each order from the drink db
+# and serve it. Exercises serve validation, tips, round advance and game over.
+start
+waitsec 0.2
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+expect served=10
+expect scene=Over
+expect score=1250

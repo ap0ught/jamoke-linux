@@ -1,0 +1,16 @@
+# Esc opens the menu overlay, which must swallow clicks so a stray keypress
+# cannot change the drink, and must not eat the run.
+start
+waitsec 0.2
+click 701 531
+expect size=tall
+key Escape
+expect paused=1
+click 644 535
+expect size=tall
+click 701 531
+expect size=tall
+key Escape
+expect paused=0
+click 644 535
+expect size=short

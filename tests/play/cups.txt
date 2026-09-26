@@ -1,0 +1,12 @@
+# Every cup size must be clickable through the real event path.
+# Regression for the hit rectangles in Game::handleClick and for the
+# window->logical input translation (run at several --window sizes).
+start
+waitsec 0.2
+expect scene=Play
+click 701 531
+expect size=tall
+click 757 523
+expect size=grande
+click 644 535
+expect size=short

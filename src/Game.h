@@ -6,6 +6,7 @@
 #include <SDL.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 struct Game {
@@ -75,6 +76,11 @@ struct Game {
   void handleClick(int x, int y);
   void update(double dt);
   void render(SDL_Renderer* r);
+
+  // Syrup bottle hit rectangles keyed by flavor name -- the same rects
+  // handleClick tests. Exposed so the --script play mode aims at the real
+  // controls instead of a second copy of these coordinates that could drift.
+  std::vector<std::pair<std::string, SDL_Rect>> syrupRects() const;
 
   void toggleFps() { showFps = !showFps; }
   void clearScores() { bestScore = 0; }

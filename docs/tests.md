@@ -24,6 +24,7 @@ GTest suite wired into CTest (`include(CTest)` + `add_test`) and linked against
 | `TestFont` | Height + width metric math |
 | `HeadlessSDLTest` (TestAssets.cpp) | Asset indexing on directories (empty / missing / case-insensitive), missing texture/audio no-crash, real-asset loading, draw-safety |
 | `GameTestFixture` | Round init/reset, difficulty time limits, selection cycling (beans/milk/size/flavor), serve validation (latte-steam / mocha-no-steam / mismatches), feedback & timer progression, full roster → Over, click hit-testing, all scenes render without crashing, boot-on-title + click-to-start, Esc pause overlay (run preserved, timer frozen, clicks swallowed), two-step confirmed quit-to-title (session record survives), session-best record + `clearScores` (and that a lower run never overwrites the record) |
+| `Input` | window→logical mapping: identity, up/downscale, degenerate sizes, round trip through window space |
 | `RealDataFaces` | Plays the full 10-order real roster and asserts every customer shows a distinct face (the by-index fix) |
 
 ## Real-data convention

@@ -50,6 +50,7 @@ if(BUILD_TESTING)
         tests/TestFont.cpp
         tests/TestAssets.cpp
         tests/TestGame.cpp
+        tests/TestInput.cpp
     )
     target_include_directories(jamoke_tests PRIVATE
         tests
@@ -60,4 +61,26 @@ if(BUILD_TESTING)
         GTest::gtest
     )
     add_test(NAME JamokeTests COMMAND jamoke_tests)
+endif()
+# Scripted play tests: drive the real binary headless through synthetic events
+# and assert on game state, so the input path (hit rects, window->logical
+# scaling, feedback freeze, pause overlay) is covered end to end. A failing
+# `expect` makes the script exit non-zero, which fails the test.
+find_package(PkgConfig REQUIRED)
+if(BUILD_TESTING)
+  foreach(script cups pause-guard full-shift)
+    foreach(win 800x600 1024x768 1600x1200)
+      if(win STREQUAL "800x600")
+        set(suffix "")
+      else()
+        set(suffix "-${win}")
+      endif()
+      add_test(NAME PlayScripts.${script}${suffix}
+               COMMAND jamoke --window ${win} --script
+                       "${CMAKE_CURRENT_SOURCE_DIR}/tests/play/${script}.txt")
+      set_tests_properties(PlayScripts.${script}${suffix} PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
+        TIMEOUT 60)
+    endforeach()
+  endforeach()
 endif()

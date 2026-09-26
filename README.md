@@ -28,8 +28,23 @@ Requires: CMake >= 3.16, a C++17 compiler, SDL2, SDL2_image.
 ```sh
 cmake -B build
 cmake --build build
+ctest --test-dir build      # unit tests + scripted play replays
 ./build/jamoke
 ```
+
+## Scripted play
+
+`--script FILE` replays a session through synthetic events and asserts on game
+state, which is how the input path is tested end to end:
+
+```sh
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+  ./build/jamoke --script tests/play/full-shift.txt
+```
+
+`--window WxH` changes the window size while the logical space stays 800x600,
+so a click can be verified to land on the same control at any scale. See
+[`docs/app.md`](docs/app.md).
 
 ## Assets
 

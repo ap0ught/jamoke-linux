@@ -256,6 +256,13 @@ void Game::serve() {
   }
 }
 
+std::vector<std::pair<std::string, SDL_Rect>> Game::syrupRects() const {
+  std::vector<std::pair<std::string, SDL_Rect>> out;
+  for (const auto& b : bottlesList())
+    out.emplace_back(b.name, SDL_Rect{b.x, b.y, 44, 115});
+  return out;
+}
+
 void Game::handleClick(int x, int y) {
   if (paused) return;  // menu overlay swallows clicks
   if (scene == Scene::Title) { startRun(); return; }

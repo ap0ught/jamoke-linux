@@ -49,19 +49,64 @@ The remake implements the original game's hot-key table (recovered from the
 - `ENTER` / `SPACE`: resume when the menu overlay is up; otherwise start a
   fresh run from the Title or Game Over screen (`game.startRun()`).
 - `F12`: framebuffer capture (dev tooling, below).
-- Left mouse down: read `SDL_GetMouseState`, scale window coords into logical
-  coords (`SDL_RenderGetLogicalSize` / `SDL_GetWindowSize` ratio), then
-  `game.handleClick(x, y)`.
+- Left mouse down: uses the position carried by the event
+  (`e.button.x/y`), **not** `SDL_GetMouseState` — the pointer may already have
+  moved by the time the event is processed, which mis-routes clicks on a fast
+  drag. The coordinates are mapped window → logical by `input::toLogical`
+  (`src/Input.h`), so a click lands on the same control at any window size.
 
 The smoothed FPS value is pushed into `game.fps` each frame (`0.9`/`0.1`
 exponential average) for the F9 counter.
+
+## Scripted play mode
+
+`--script FILE` replays a session by pushing synthetic events through the *same*
+event loop a human's mouse drives, and asserts on game state. This is how the
+input path gets tested end to end — hit rectangles, input scaling, the serve
+freeze and the pause overlay are all things a unit test on `handleClick` alone
+cannot reach.
+
+```sh
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+  ./build/jamoke --script tests/play/cups.txt
+```
+
+| Command | Effect |
+|---------|--------|
+| `start` | push Enter (title → run) |
+| `click X Y` | left click at **logical** `X Y`, converted to window pixels and back so the real translation is exercised |
+| `key NAME` | push a key by SDL name (`Escape`, `F5`, `Return`, `Q`) |
+| `build` | queue the clicks that make the drink match the current order (from the drink db) |
+| `serve` | click the serve button |
+| `wait N` | wait N frames |
+| `waitsec S` | wait S seconds of wall time |
+| `waitclear` | wait until the serve feedback pause finishes — prefer this over `waitsec`; a guessed duration is a race against the 1.6 s pause and losing it silently swallows later clicks |
+| `state` | print every game-state field |
+| `expect k=v` | assert one field (`size`, `flavor`, `score`, `served`, `scene`, `paused`, `frozen`, `msg`, …); failures print `FAIL` |
+| `shot PATH` | capture a PNG to `PATH` |
+
+A failing `expect` makes the process exit non-zero, so a script doubles as a CI
+fixture; a script that runs out exits by itself. `modifier` combinations
+(Ctrl-Alt-C, Ctrl-D) cannot be synthesized — `SDL_PushEvent` does not update
+the keyboard state — so those stay covered by unit tests.
+
+`--window WxH` overrides the window size while the logical space stays
+800x600. Replaying the same script at several sizes is what proves the input
+scaling is correct, and it is also what caught the capture overflow below.
+
+Fixtures live in `tests/play/` and run from CTest as `PlayScripts.*` at 800x600,
+1024x768 and 1600x1200 (`docs/tests.md`).
 
 ## Dev tooling
 
 - `F12`: capture the framebuffer via `SDL_RenderReadPixels` into an RGBA
   surface (little-endian channel masks) and `IMG_SavePNG` to
-  `jamoke_capture.png` at the logical size.
+  `jamoke_capture.png`. The surface is sized from `SDL_GetRendererOutputSize`,
+  **not** the logical size: a null read rect reads the whole render target,
+  which is window-sized, so allocating at 800x600 only works while the window
+  happens to be exactly that size — a larger window overran the buffer and
+  segfaulted.
 - `./build/jamoke --shot`: auto-captures once (frame 30, the title screen —
-  the `Game` constructor leaves `scene = Title` and nothing advances it until
-  the player starts) and exits — used for offscreen pixel verification, e.g.
+  the `Game` constructor holds `Scene::Title` until the player starts) and
+  exits — used for offscreen pixel verification, e.g.
   `SDL_VIDEODRIVER=dummy ./build/jamoke --shot`.
