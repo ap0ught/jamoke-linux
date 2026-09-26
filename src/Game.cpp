@@ -532,14 +532,22 @@ void Game::render(SDL_Renderer* r) {
       drawHud(r);
       break;
     case Scene::Over: {
-      SDL_Rect g = {250, 120, 300, 240};
+      // GAMEOVER.jpg is a *two-frame vertical strip* (350x278 = 2 x 350x139,
+      // both frames identical). Drawing the whole texture stacks two squashed
+      // "Game Over" panels on top of each other, so take the top frame and
+      // preserve its aspect ratio.
       SDL_Texture* go = a.tex("uiart/gameover.jpg");
-      if (go) SDL_RenderCopy(r, go, nullptr, &g);
+      int gw = a.texW("uiart/gameover.jpg"), gh = a.texH("uiart/gameover.jpg");
+      if (go && gw > 0 && gh > 0) {
+        SDL_Rect src = {0, 0, gw, gh / 2};
+        SDL_Rect dst = {250, 170, 300, (300 * (gh / 2)) / gw};
+        SDL_RenderCopy(r, go, &src, &dst);
+      }
       std::string line = "FINAL SCORE " + std::to_string(score);
-      font::draw(r, line, 280, 390, 255, 235, 120, 3, 300);
-      font::draw(r, "BEST " + std::to_string(bestScore), 340, 430, 200, 200, 210, 1, 140);
+      font::draw(r, line, 280, 400, 255, 235, 120, 3, 300);
+      font::draw(r, "BEST " + std::to_string(bestScore), 340, 440, 200, 200, 210, 1, 140);
       font::draw(r, "Click anywhere or press ENTER / SPACE to play again",
-                 140, 460, 220, 220, 220, 2, 520);
+                 140, 475, 220, 220, 220, 2, 520);
       break;
     }
   }

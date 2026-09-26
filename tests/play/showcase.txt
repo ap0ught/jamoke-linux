@@ -1,0 +1,40 @@
+# Narrate a full shift with captures at each beat.
+shot media/shots/show_1_title.png
+start
+waitsec 0.3
+shot media/shots/show_2_order.png
+build
+shot media/shots/show_3_built.png
+serve
+shot media/shots/show_4_correct.png
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+shot media/shots/show_5_mid.png
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+build
+serve
+waitclear
+expect scene=Over
+shot media/shots/show_6_over.png
