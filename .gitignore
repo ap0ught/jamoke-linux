@@ -1,0 +1,7 @@
+build/
+*.o
+.idea/
+media/
+cmake-build-debug/
+*.iml
+jamoke_capture.png
