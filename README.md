@@ -10,7 +10,7 @@ reimplemented from scratch (the original executables were DirectX 7, WizBang
 
 Playable Slice + original hot-key behavior:
 
-- Title screen (click / Enter / Space to start)
+- Title screen on boot (click, Enter or Space to start)
 - 10-customer shift; each customer orders a drink
 - Build on the machine: grind regular/decaf/split beans, 1-3 shots,
   whole/nonfat milk, steam toggle, 8 syrup flavors
@@ -47,6 +47,6 @@ EULA; only the source and data parsers are checked in.
 
 - Mouse: click machine parts to build, click the order board button to serve.
 - Enter / Space: start / restart.
-- Esc: mid-game back to the title menu; on Title/Over quits.
+- Esc: menu overlay mid-game (run preserved); on Title/Over quits. Q quits to title (confirmed).
 - F2 reload art, F5 restart, F9 fps counter, Ctrl-Alt-C clear scores,
   Ctrl-D vsync toggle, F12 screenshot.

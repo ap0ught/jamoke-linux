@@ -6,10 +6,13 @@ everything else together: `Assets` for media, `DrinkDB` for orders/roster, and
 
 ## Scenes
 
-`Scene = { Title, Play, Over }`. The game is constructed already in `Play`
-(the first order is live immediately); Title/Over are entered by switching
-`scene`. `reset()` re-inits run state (idx/score/served/feedback) and starts a
-fresh round.
+`Scene = { Title, Play, Over }`. The game **boots on `Title`** (like the
+original) so no order timer runs before the player chooses to start; the
+constructor calls `reset()` to stage the first round and then holds `Title`.
+`startRun()` commits to it and enters `Play` — bound to Enter/Space on
+Title/Over *and* to a left click on Title (the title screen advertises
+"click the ORDER BOARD"). `reset()` re-inits run state
+(idx/score/served/feedback) and starts a fresh round.
 
 ## Roster & rounds
 
@@ -61,11 +64,17 @@ frame; hitting 0 routes into the feedback path above.
 - `bestScore` holds the session high score; the game-over transition in
   `newRound()` records `max(bestScore, score)` so a fresh run never erases it.
   Shown on the Title screen and next to the final score. `clearScores()`
-  (Ctrl-Alt-C) zeroes it.
+  (Ctrl-Alt-C) zeroes it. The record survives abandoning a run.
 - `showFps` + `fps`: the F9 counter. `toggleFps()` flips the flag; `main.cpp`
   pushes a smoothed 0.9/0.1 running average into `fps` each frame.
-- `toTitle()`: Esc mid-game shim — resets the run and lands back on the Title
-  scene (the original opened an options overlay the remake doesn't have).
+- `paused` + `quitPending`: the Esc menu overlay. `togglePause()` opens and
+  closes it while keeping the run intact; `update()` returns early and
+  `handleClick()` swallows input while it is up, so the customer timer cannot
+  drain behind the menu. `requestQuitToTitle()` is the only destructive path
+  and it needs two presses — the first arms `quitPending` and the overlay
+  warns, the second calls `toTitle()` (full `reset()` + `Scene::Title`).
+- `startRun()`: Title/Over into a fresh `Scene::Play` round. `toTitle()` is
+  the abandon-a-run operation and is only reachable from the confirmed quit.
 
 ## Rendering
 

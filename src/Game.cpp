@@ -86,6 +86,10 @@ SDL_Texture* keyedTex(Assets& a, const std::string& rel) {
 
 Game::Game(Assets& assets, DrinkDB& drinks) : a(assets), db(drinks) {
   reset();
+  // Boot on the title menu like the original, so the first order's timer
+  // never runs before the player has actually started. reset() leaves the
+  // first round staged; startRun() is what commits to it.
+  scene = Scene::Title;
 }
 
 void Game::reset() {
@@ -100,12 +104,38 @@ void Game::reset() {
   steamed = false;
   flavor = "none";
   overWav = false;
+  paused = false;
+  quitPending = false;
   pickRoster();
   newRound();
 }
 
-// Esc mid-game folds the original "options" behaviour into a trip back to
-// the title menu (the remake has no options overlay to open).
+// Enter/Space from the title menu or the game-over card: a fresh run.
+void Game::startRun() {
+  reset();
+  scene = Scene::Play;
+}
+
+// Esc mid-game opens the original's menu/options overlay, which leaves the
+// run untouched (unlike a straight trip to the title menu, which would throw
+// away the score on a stray keypress).
+void Game::togglePause() {
+  if (scene != Scene::Play) return;
+  paused = !paused;
+  quitPending = false;
+}
+
+// Abandoning a run is destructive, so the menu overlay arms a confirmation
+// and only acts on a second press.
+void Game::requestQuitToTitle() {
+  if (!paused) return;
+  if (!quitPending) {
+    quitPending = true;
+    return;
+  }
+  toTitle();
+}
+
 void Game::toTitle() {
   reset();
   scene = Scene::Title;
@@ -227,6 +257,8 @@ void Game::serve() {
 }
 
 void Game::handleClick(int x, int y) {
+  if (paused) return;  // menu overlay swallows clicks
+  if (scene == Scene::Title) { startRun(); return; }
   if (scene == Scene::Over) { reset(); return; }
   if (scene != Scene::Play || resolveT > 0.0) return;  // no input mid-feedback
 
@@ -266,6 +298,7 @@ void Game::handleClick(int x, int y) {
 
 void Game::update(double dt) {
   if (scene != Scene::Play) return;
+  if (paused) return;  // menu overlay: freeze the timer and the round
 
   // One order voice-over per customer: pick a file by gender and a rotation
   // of four recordings so repeats don't stall.
@@ -483,8 +516,7 @@ void Game::render(SDL_Renderer* r) {
                    255, 235, 120, 2, 200);
       font::draw(r, "SERVE 10 CUSTOMERS - GET TIPS!", 180, 460, 200, 200, 210, 1, 420);
       font::draw(r, "F2 art  F5 restart  F9 fps  CTRL+ALT+C scores  CTRL+D vsync  ESC menu",
-                 40, 500, 150, 150, 160, 1, 720);
-      break;
+                 40, 500, 150, 150, 160, 1, 720);      break;
     }
     case Scene::Play:
       drawBoard(r);
@@ -503,6 +535,25 @@ void Game::render(SDL_Renderer* r) {
                  140, 460, 220, 220, 220, 2, 520);
       break;
     }
+  }
+
+  // Menu overlay (Esc): dims the live board without touching run state, so a
+  // stray Esc can never cost the player a run.
+  if (paused) {
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r, 0, 0, 0, 170);
+    SDL_Rect dim = {0, 0, 800, 600};
+    SDL_RenderFillRect(r, &dim);
+    font::draw(r, "MENU", 340, 190, 255, 235, 120, 3, 120);
+    font::draw(r, "ESC or ENTER  resume", 250, 270, 230, 230, 230, 2, 300);
+    font::draw(r, "F5  restart this run", 250, 310, 230, 230, 230, 2, 300);
+    font::draw(r, "Q  quit to title", 250, 350, 230, 230, 230, 2, 300);
+    if (quitPending)
+      font::draw(r, "PRESS Q AGAIN - THIS ENDS THE RUN (SCORE LOST)",
+                 120, 410, 255, 120, 120, 2, 560);
+    font::draw(r, "CUST " + std::to_string(idx + 1) + "/10   SCORE " +
+                      std::to_string(score),
+               250, 460, 200, 200, 210, 1, 300);
   }
 
   SDL_RenderPresent(r);

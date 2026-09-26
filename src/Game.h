@@ -43,7 +43,6 @@ struct Game {
   // Run-wide progress across the 10-customer roster.
   int score = 0;
   int served = 0;
-  int bestStreak = 0;
   int bestScore = 0;  // session record; cleared with Ctrl-Alt-C
 
   // Debug readouts (original hotkeys): F9 toggles the FPS counter, Ctrl-D
@@ -51,12 +50,21 @@ struct Game {
   bool showFps = false;
   double fps = 0.0;
 
+  // Esc during play opens the original's in-place menu/options overlay. The
+  // run is preserved (score, customer, timer) so quitting back to the title
+  // stays an explicit choice rather than a stray keypress.
+  bool paused = false;
+  bool quitPending = false;  // first Q press arms it; a second Q confirms
+
   bool overWav = false;
 
   explicit Game(Assets& a, DrinkDB& db);
 
   void reset();
-  void toTitle();            // Esc mid-game: back to the title menu
+  void startRun();           // Title/Over -> begin a fresh run
+  void togglePause();        // Esc during play: menu overlay on/off
+  void requestQuitToTitle(); // Q on the menu overlay (two-step confirm)
+  void toTitle();            // abandon the run and return to the title menu
   void newRound();
   void selectBean(const std::string& b);
   void selectMilk(const std::string& m);

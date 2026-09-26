@@ -68,6 +68,12 @@ class GameTestFixture : public HeadlessSDLTest {
 TEST_F(GameTestFixture, InitAndResetState) {
   Game game(*assets, db);
 
+  // Boots on the title menu (like the original) so no order timer is
+  // running before the player chooses to start.
+  EXPECT_EQ(game.scene, Game::Scene::Title);
+  EXPECT_FALSE(game.paused);
+
+  game.startRun();
   EXPECT_EQ(game.scene, Game::Scene::Play);
   EXPECT_EQ(game.score, 0);
   EXPECT_EQ(game.served, 0);
@@ -94,6 +100,7 @@ TEST_F(GameTestFixture, InitAndResetState) {
 
 TEST_F(GameTestFixture, TargetDifficultyTimeLimits) {
   Game game(*assets, db);
+  game.startRun();
 
   // Customer 0 is D_LATTE (easy) -> 55.0
   EXPECT_DOUBLE_EQ(game.timeLeft, 55.0);
@@ -115,6 +122,7 @@ TEST_F(GameTestFixture, TargetDifficultyTimeLimits) {
 
 TEST_F(GameTestFixture, BeanSelectionCycling) {
   Game game(*assets, db);
+  game.startRun();
 
   EXPECT_EQ(game.bean, "regular");
 
@@ -141,6 +149,7 @@ TEST_F(GameTestFixture, BeanSelectionCycling) {
 
 TEST_F(GameTestFixture, MilkAndSizeSelection) {
   Game game(*assets, db);
+  game.startRun();
 
   // Milk
   game.selectMilk("nonfat");
@@ -159,6 +168,7 @@ TEST_F(GameTestFixture, MilkAndSizeSelection) {
 
 TEST_F(GameTestFixture, FlavorSelectionToggle) {
   Game game(*assets, db);
+  game.startRun();
 
   EXPECT_EQ(game.flavor, "none");
 
@@ -178,6 +188,7 @@ TEST_F(GameTestFixture, FlavorSelectionToggle) {
 
 TEST_F(GameTestFixture, ServeValidationLatte) {
   Game game(*assets, db);
+  game.startRun();
 
   // Target is D_LATTE: tall, double, regular, nonfat, hazelnut, latte (wants steam)
   game.selectSize("tall");
@@ -199,6 +210,7 @@ TEST_F(GameTestFixture, ServeValidationLatte) {
 
 TEST_F(GameTestFixture, ServeValidationLatteRequiresSteam) {
   Game game(*assets, db);
+  game.startRun();
 
   // Target is D_LATTE
   game.selectSize("tall");
@@ -219,6 +231,7 @@ TEST_F(GameTestFixture, ServeValidationLatteRequiresSteam) {
 
 TEST_F(GameTestFixture, ServeValidationMochaDoesNotWantSteam) {
   Game game(*assets, db);
+  game.startRun();
 
   // Switch to Mocha target
   game.idx = 1;
@@ -250,6 +263,7 @@ TEST_F(GameTestFixture, ServeValidationMochaDoesNotWantSteam) {
 
 TEST_F(GameTestFixture, ServeMismatchesAttributeTests) {
   Game game(*assets, db);
+  game.startRun();
   // Target: tall, double, regular, nonfat, hazelnut, steamed=true
 
   auto setupCorrect = [&]() {
@@ -296,6 +310,7 @@ TEST_F(GameTestFixture, ServeMismatchesAttributeTests) {
 
 TEST_F(GameTestFixture, ServeIgnoredWhileResolving) {
   Game game(*assets, db);
+  game.startRun();
   game.resolveT = 1.0;
   game.resolveResult = true;
   game.score = 125;
@@ -309,6 +324,7 @@ TEST_F(GameTestFixture, ServeIgnoredWhileResolving) {
 
 TEST_F(GameTestFixture, UpdateTimerAndTimeout) {
   Game game(*assets, db);
+  game.startRun();
   EXPECT_DOUBLE_EQ(game.timeLeft, 55.0);
 
   // Small update decreases timeLeft
@@ -325,6 +341,7 @@ TEST_F(GameTestFixture, UpdateTimerAndTimeout) {
 
 TEST_F(GameTestFixture, UpdateResolveFeedbackProgression) {
   Game game(*assets, db);
+  game.startRun();
   game.resolveT = 1.6;
   game.idx = 0;
   game.served = 0;
@@ -344,6 +361,7 @@ TEST_F(GameTestFixture, UpdateResolveFeedbackProgression) {
 
 TEST_F(GameTestFixture, FullRosterProgressionToGameOver) {
   Game game(*assets, db);
+  game.startRun();
 
   for (int i = 0; i < 10; ++i) {
     EXPECT_EQ(game.scene, Game::Scene::Play);
@@ -357,16 +375,105 @@ TEST_F(GameTestFixture, FullRosterProgressionToGameOver) {
   EXPECT_EQ(game.scene, Game::Scene::Over);
 }
 
+TEST_F(GameTestFixture, EscPausesInPlaceAndPreservesTheRun) {
+  Game game(*assets, db);
+  game.startRun();
+  EXPECT_EQ(game.scene, Game::Scene::Play);
+
+  game.score = 250;
+  game.idx = 4;
+  game.timeLeft = 30.0;
+
+  // Esc opens the menu overlay; the run is untouched.
+  game.togglePause();
+  EXPECT_TRUE(game.paused);
+  EXPECT_EQ(game.scene, Game::Scene::Play);
+  EXPECT_EQ(game.score, 250);
+  EXPECT_EQ(game.idx, 4u);
+
+  // A paused game must not drain the customer timer or advance the round.
+  game.update(5.0);
+  EXPECT_DOUBLE_EQ(game.timeLeft, 30.0);
+  EXPECT_EQ(game.idx, 4u);
+
+  // Clicks are swallowed while the overlay is up (no free build/serve).
+  game.selectBean("decaf");
+  game.handleClick(100, 160);
+  EXPECT_EQ(game.bean, "decaf");
+
+  // Esc again resumes in place.
+  game.togglePause();
+  EXPECT_FALSE(game.paused);
+  EXPECT_EQ(game.score, 250);
+  game.update(5.0);
+  EXPECT_DOUBLE_EQ(game.timeLeft, 25.0);
+}
+
+TEST_F(GameTestFixture, QuittingToTitleIsConfirmedAndDestructive) {
+  Game game(*assets, db);
+  game.startRun();
+  game.score = 250;
+  game.idx = 4;
+  game.togglePause();
+  ASSERT_TRUE(game.paused);
+
+  // First Q only arms the confirmation.
+  game.requestQuitToTitle();
+  EXPECT_TRUE(game.quitPending);
+  EXPECT_EQ(game.scene, Game::Scene::Play);
+  EXPECT_EQ(game.score, 250);
+
+  // Second Q abandons the run for the title menu.
+  game.requestQuitToTitle();
+  EXPECT_EQ(game.scene, Game::Scene::Title);
+  EXPECT_FALSE(game.paused);
+  EXPECT_EQ(game.idx, 0u);
+  EXPECT_EQ(game.score, 0);
+
+  // The session record must survive an abandoned run: bank a 900 first, then
+  // quit a later run to the title and confirm the record is still there.
+  game.startRun();
+  for (int i = 0; i < 9; ++i) {
+    game.serve();
+    game.update(2.0);
+  }
+  game.score = 900;
+  game.serve();
+  game.update(2.0);
+  ASSERT_EQ(game.scene, Game::Scene::Over);
+  ASSERT_EQ(game.bestScore, 900);
+
+  game.startRun();
+  game.togglePause();
+  game.requestQuitToTitle();
+  game.requestQuitToTitle();
+  EXPECT_EQ(game.scene, Game::Scene::Title);
+  EXPECT_EQ(game.bestScore, 900);
+}
+
+TEST_F(GameTestFixture, ClickingTheTitleStartsARun) {
+  Game game(*assets, db);
+  ASSERT_EQ(game.scene, Game::Scene::Title);
+
+  // The title screen advertises clicking the order board; that must work.
+  game.handleClick(650, 200);
+  EXPECT_EQ(game.scene, Game::Scene::Play);
+  EXPECT_EQ(game.idx, 0u);
+  EXPECT_EQ(game.score, 0);
+  ASSERT_NE(game.target, nullptr);
+}
+
 TEST_F(GameTestFixture, ToTitleReturnsToMenu) {
   Game game(*assets, db);
+  game.startRun();
   EXPECT_EQ(game.scene, Game::Scene::Play);
 
   game.score = 50;
   game.idx = 4;
   game.toTitle();
 
-  // Esc mid-game lands on the title menu with the round state cleared so the
-  // next Enter-start is a fresh run.
+  // Abandoning a run lands on the title menu with the round state cleared so
+  // the next start is a fresh run.
   EXPECT_EQ(game.scene, Game::Scene::Title);
   EXPECT_EQ(game.idx, 0u);
   EXPECT_EQ(game.score, 0);
@@ -374,6 +481,7 @@ TEST_F(GameTestFixture, ToTitleReturnsToMenu) {
 
 TEST_F(GameTestFixture, BestScoreTracksRecordAndClearScores) {
   Game game(*assets, db);
+  game.startRun();
 
   // F9 toggles the fps readout flag.
   EXPECT_FALSE(game.showFps);
@@ -414,6 +522,7 @@ TEST_F(GameTestFixture, BestScoreTracksRecordAndClearScores) {
 
 TEST_F(GameTestFixture, HandleClickUIElements) {
   Game game(*assets, db);
+  game.startRun();
 
   // Grinder regular: {92, 150, 64, 70}
   game.bean = "decaf";
@@ -483,6 +592,7 @@ TEST_F(GameTestFixture, HandleClickUIElements) {
 TEST_F(GameTestFixture, RenderAllScenesWithoutCrash) {
   ASSERT_NE(renderer, nullptr);
   Game game(*assets, db);
+  game.startRun();
 
   // Title scene
   game.scene = Game::Scene::Title;
@@ -522,6 +632,7 @@ TEST(RealDataFaces, EachRosterCustomerGetsOwnFaceByIndex) {
   ASSERT_TRUE(db.load(root));
 
   Game game(a, db);
+  game.startRun();
 
   // Every customer in the 10-slot roster must show a different face.
   std::set<std::string> seen;

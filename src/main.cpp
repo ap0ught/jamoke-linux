@@ -90,14 +90,15 @@ int main(int argc, char** argv) {
         bool alt = ks[SDL_SCANCODE_LALT] || ks[SDL_SCANCODE_RALT];
         SDL_Keycode k = e.key.keysym.sym;
 
-        // Original manual hotkeys: Esc = options/back-to-menu, F2 = reload
-        // all art, F5 = restart the game, F9 = fps counter, Ctrl-Alt-C =
-        // clear high scores, Ctrl-D = update/vsync mode, Enter/Space dismiss
-        // pop-ups (start here). F12 stays the capture key.
+        // Original manual hotkeys: Esc = in-place menu/options (run preserved),
+        // F2 = reload all art, F5 = restart the game, F9 = fps counter,
+        // Ctrl-Alt-C = clear high scores, Ctrl-D = update/vsync mode,
+        // Enter/Space dismiss pop-ups (start here). F12 stays the capture key.
         if (k == SDLK_ESCAPE) {
-          if (game.scene == Game::Scene::Play) game.toTitle();
+          if (game.scene == Game::Scene::Play) game.togglePause();
           else quit = true;
         }
+        if (k == SDLK_q) game.requestQuitToTitle();
         if (k == SDLK_F2) assets.reloadArt();
         if (k == SDLK_F5 && game.scene == Game::Scene::Play) game.reset();
         if (k == SDLK_F9) game.toggleFps();
@@ -114,10 +115,11 @@ int main(int argc, char** argv) {
         (void)vsync;
 #endif
         if (k == SDLK_RETURN || k == SDLK_SPACE) {
-          if (game.scene == Game::Scene::Title) {
-            game.reset();
-          } else if (game.scene == Game::Scene::Over) {
-            game.reset();
+          if (game.paused) {
+            game.togglePause();  // menu overlay: Enter resumes
+          } else if (game.scene == Game::Scene::Title ||
+                     game.scene == Game::Scene::Over) {
+            game.startRun();
           }
         }
       } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {

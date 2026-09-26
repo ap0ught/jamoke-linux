@@ -27,20 +27,27 @@ not contain gameplay logic — only SDL lifecycle, input plumbing, and dev tooli
 The remake implements the original game's hot-key table (recovered from the
 2001 `manual.rtf` in the mezzanine archive — see `docs/provenance.md`):
 
-- `ESC`: quit (Title/Over); during play, back to the title menu
-  (`game.toTitle()` — the original opened the options overlay, which the
-  remake doesn't have).
+- `ESC`: quit (Title/Over); during play, toggles the in-place menu overlay
+  (`game.togglePause()`). The overlay **preserves the run** — score, customer
+  and timer all survive — because the original's menu/options opened in place.
+  `update()` and `handleClick()` both no-op while `game.paused`, so the
+  customer timer cannot drain behind the menu.
+- `Q`: on the menu overlay, quit to the title menu. Destructive, so it is
+  **two-step**: the first press arms `quitPending` and shows a warning, the
+  second abandons the run (`game.requestQuitToTitle()`). This is deliberate —
+  a single stray Esc must never cost the player a run.
 - `F2`: `assets.reloadArt()` — drops the lazy texture cache so all art is
   re-decoded from disk (the original "restarts the entire application,
-  reloading in all the art").
+  reloading in all the art"). Safe at any time: nothing caches an
+  `SDL_Texture*` outside `Assets`, so there is nothing left dangling.
 - `F5`: restart the current game mid-play (`game.reset()`).
 - `F9`: toggle the FPS readout (`game.showFps`, drawn in the HUD).
 - `CTRL+ALT+C`: clear the session high score (`game.clearScores()`).
 - `CTRL+D`: toggle vsync (`SDL_RenderSetVSync`, guarded by
   `SDL_VERSION_ATLEAST(2,0,18)` — the manual's "continuous vs double-buffer
   update" mode; unsupported drivers print but never crash).
-- `ENTER` / `SPACE`: dismiss pop-ups — advances from the Title or Game Over
-  screen (`game.reset()`).
+- `ENTER` / `SPACE`: resume when the menu overlay is up; otherwise start a
+  fresh run from the Title or Game Over screen (`game.startRun()`).
 - `F12`: framebuffer capture (dev tooling, below).
 - Left mouse down: read `SDL_GetMouseState`, scale window coords into logical
   coords (`SDL_RenderGetLogicalSize` / `SDL_GetWindowSize` ratio), then
@@ -54,8 +61,7 @@ exponential average) for the F9 counter.
 - `F12`: capture the framebuffer via `SDL_RenderReadPixels` into an RGBA
   surface (little-endian channel masks) and `IMG_SavePNG` to
   `jamoke_capture.png` at the logical size.
-- `./build/jamoke --shot`: auto-captures once (frame 30, mid-game — the
-  `Game` constructor calls `reset()`, which forces `Scene::Play`, so the
-  capture is the live order board, not the title menu) and exits — used for
-  offscreen pixel verification, e.g.
+- `./build/jamoke --shot`: auto-captures once (frame 30, the title screen —
+  the `Game` constructor leaves `scene = Title` and nothing advances it until
+  the player starts) and exits — used for offscreen pixel verification, e.g.
   `SDL_VIDEODRIVER=dummy ./build/jamoke --shot`.
