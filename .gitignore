@@ -1,7 +1,15 @@
+# build output
 build/
-*.o
-.idea/
-media/
 cmake-build-debug/
+*.o
+
+# editor / IDE
+.idea/
+.cache/
 *.iml
+
+# Original game media and anything derived from it (RealNetworks EULA, see
+# README.md): the extracted DATA tree, the recovered mezzanine payload, and
+# the screenshots tools/capture-play.sh generates.
+media/
 jamoke_capture.png
