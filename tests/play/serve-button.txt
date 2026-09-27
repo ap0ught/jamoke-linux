@@ -1,0 +1,12 @@
+# The ORDER control is the white arrow baked into the left sidebar of
+# Background.jpg (its near-white pixels span x 1..195, y 256..350). Clicking
+# the visible control must serve -- the regression guard for issue #4, where
+# the hit rect sat in an empty region on the right with no affordance.
+start
+waitsec 0.2
+build
+click 20 300
+expect frozen=1
+waitclear
+expect served=1
+expect score=125

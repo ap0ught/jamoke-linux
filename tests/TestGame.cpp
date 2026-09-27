@@ -524,48 +524,48 @@ TEST_F(GameTestFixture, HandleClickUIElements) {
   Game game(*assets, db);
   game.startRun();
 
-  // Grinder regular: {92, 150, 64, 70}
-  game.bean = "decaf";
-  game.handleClick(100, 160);
-  EXPECT_EQ(game.bean, "regular");
+  // All coordinates come from the shared control table, so this test cannot
+  // drift away from the rects the game actually hit-tests.
+  const Game::Controls& ctl = Game::controls();
 
-  // Grinder decaf: {166, 150, 64, 70}
-  game.handleClick(170, 160);
+  // Grinder regular / decaf
+  game.bean = "decaf";
+  game.handleClick(ctl.beanRegular.x + 10, ctl.beanRegular.y + 10);
+  EXPECT_EQ(game.bean, "regular");
+  game.handleClick(ctl.beanDecaf.x + 10, ctl.beanDecaf.y + 10);
   EXPECT_EQ(game.bean, "decaf");
 
-  // Milk whole: {92, 250, 68, 121}
+  // Milk whole / nonfat
   game.milk = "nonfat";
-  game.handleClick(100, 260);
+  game.handleClick(ctl.milkWhole.x + 10, ctl.milkWhole.y + 10);
   EXPECT_EQ(game.milk, "whole");
-
-  // Milk nonfat: {172, 250, 68, 121}
-  game.handleClick(180, 260);
+  game.handleClick(ctl.milkNonfat.x + 10, ctl.milkNonfat.y + 10);
   EXPECT_EQ(game.milk, "nonfat");
 
-  // Cup size stacks: {620, 480, 48, 110}, {672, 460, 54, 130}, {730, 440, 60, 150}
-  game.handleClick(690, 500);
+  // Cup size stacks
+  game.handleClick(ctl.cupTall.x + 10, ctl.cupTall.y + 10);
   EXPECT_EQ(game.size, "tall");
-  game.handleClick(750, 490);
+  game.handleClick(ctl.cupGrande.x + 10, ctl.cupGrande.y + 10);
   EXPECT_EQ(game.size, "grande");
-  game.handleClick(640, 520);
+  game.handleClick(ctl.cupShort.x + 10, ctl.cupShort.y + 10);
   EXPECT_EQ(game.size, "short");
 
-  // Shots (spigots 1, 2, 3): {285, 230, 110, 80}, {400, 230, 110, 80}, {510, 230, 110, 80}
-  game.handleClick(450, 260);
+  // Shots (spigots 1, 2, 3)
+  game.handleClick(ctl.shot2.x + 20, ctl.shot2.y + 20);
   EXPECT_EQ(game.shots, 2);
-  game.handleClick(550, 260);
+  game.handleClick(ctl.shot3.x + 20, ctl.shot3.y + 20);
   EXPECT_EQ(game.shots, 3);
-  game.handleClick(340, 260);
+  game.handleClick(ctl.shot1.x + 20, ctl.shot1.y + 20);
   EXPECT_EQ(game.shots, 1);
 
-  // Steamer: {580, 115, 60, 60}
+  // Steamer
   EXPECT_FALSE(game.steamed);
-  game.handleClick(595, 135);
+  game.handleClick(ctl.steamer.x + 10, ctl.steamer.y + 10);
   EXPECT_TRUE(game.steamed);
-  game.handleClick(595, 135);
+  game.handleClick(ctl.steamer.x + 10, ctl.steamer.y + 10);
   EXPECT_FALSE(game.steamed);
 
-  // Flavor: top shelf bottles (chocolate at {280, 44, 44, 115})
+  // Flavor: top shelf bottles
   game.handleClick(300, 70);
   EXPECT_EQ(game.flavor, "chocolate");
 
@@ -573,9 +573,9 @@ TEST_F(GameTestFixture, HandleClickUIElements) {
   game.handleClick(300, 70);
   EXPECT_EQ(game.flavor, "none");
 
-  // Serve button: {600, 140, 177, 252}
+  // Serve: the ORDER control on the left sidebar
   EXPECT_EQ(game.resolveT, 0.0);
-  game.handleClick(650, 200);
+  game.handleClick(ctl.serve.x + 20, ctl.serve.y + 20);
   EXPECT_DOUBLE_EQ(game.resolveT, 1.6);
 
   // Click during resolve should do nothing
@@ -650,4 +650,77 @@ TEST(RealDataFaces, EachRosterCustomerGetsOwnFaceByIndex) {
 
   SDL_DestroyRenderer(r);
   SDL_DestroyWindow(w);
+}
+
+// The drawn control rects and the hit rects are now one table (Game::controls),
+// so the failure mode "drawn in one place, clickable in another" is gone by
+// construction. These tests lock the invariants that table still has to keep,
+// since nothing else in the suite can see the art: the unit tests never call
+// Assets::loadRoot(), so they run with no textures at all.
+namespace {
+std::vector<SDL_Rect> allControlRects() {
+  const Game::Controls& c = Game::controls();
+  std::vector<SDL_Rect> v{c.serve,     c.beanRegular, c.beanDecaf,   c.milkWhole,
+                          c.milkNonfat, c.cupShort,  c.cupTall,     c.cupGrande,
+                          c.shot1,     c.shot2,      c.shot3,       c.steamer};
+  for (const auto& kv : c.syrups) v.push_back(kv.second);
+  return v;
+}
+}  // namespace
+
+TEST(GameLayout, EveryControlIsInsideTheLogicalSpace) {
+  for (const SDL_Rect& r : allControlRects()) {
+    EXPECT_GE(r.x, 0) << "rect starts left of the screen";
+    EXPECT_GE(r.y, 0) << "rect starts above the screen";
+    EXPECT_LE(r.x + r.w, 800) << "rect runs off the right edge";
+    EXPECT_LE(r.y + r.h, 600) << "rect runs off the bottom edge";
+    EXPECT_GT(r.w, 0);
+    EXPECT_GT(r.h, 0);
+  }
+}
+
+TEST(GameLayout, ControlsDoNotOverlap) {
+  // Overlapping boxes silently steal each other's clicks: handleClick tests in
+  // order, so the earlier control wins and the later one becomes unclickable.
+  // That is exactly the "clicking the tall cup does nothing" family of report.
+  const Game::Controls& c = Game::controls();
+  std::vector<std::pair<std::string, SDL_Rect>> named{
+      {"serve", c.serve},
+      {"beanRegular", c.beanRegular},
+      {"beanDecaf", c.beanDecaf},
+      {"milkWhole", c.milkWhole},
+      {"milkNonfat", c.milkNonfat},
+      {"cupShort", c.cupShort},
+      {"cupTall", c.cupTall},
+      {"cupGrande", c.cupGrande},
+      {"shot1", c.shot1},
+      {"shot2", c.shot2},
+      {"shot3", c.shot3},
+      {"steamer", c.steamer},
+  };
+  for (const auto& kv : c.syrups) named.emplace_back("syrup:" + kv.first, kv.second);
+
+  for (size_t i = 0; i < named.size(); ++i) {
+    for (size_t j = i + 1; j < named.size(); ++j) {
+      const SDL_Rect& a = named[i].second;
+      const SDL_Rect& b = named[j].second;
+      bool disjoint = a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y ||
+                      b.y + b.h <= a.y;
+      EXPECT_TRUE(disjoint) << named[i].first << " overlaps " << named[j].first;
+    }
+  }
+}
+
+TEST(GameLayout, SyrupRectsMatchTheBottlePositions) {
+  // syrupRects() is what the --script play mode aims at, so it must be the
+  // same boxes the game hit-tests, not a parallel copy.
+  const Game::Controls& c = Game::controls();
+  ASSERT_EQ(c.syrups.size(), 8u);
+  const auto& exposed = Game::syrupRects();
+  EXPECT_EQ(exposed.size(), c.syrups.size());
+  for (size_t i = 0; i < c.syrups.size(); ++i) {
+    EXPECT_EQ(exposed[i].first, c.syrups[i].first);
+    EXPECT_EQ(exposed[i].second.x, c.syrups[i].second.x);
+    EXPECT_EQ(exposed[i].second.y, c.syrups[i].second.y);
+  }
 }

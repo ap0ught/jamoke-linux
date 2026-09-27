@@ -77,10 +77,36 @@ struct Game {
   void update(double dt);
   void render(SDL_Renderer* r);
 
-  // Syrup bottle hit rectangles keyed by flavor name -- the same rects
-  // handleClick tests. Exposed so the --script play mode aims at the real
-  // controls instead of a second copy of these coordinates that could drift.
-  std::vector<std::pair<std::string, SDL_Rect>> syrupRects() const;
+  // Every clickable control's rectangle, in the fixed 800x600 logical space.
+  //
+  // This is deliberately ONE table read by both the hit test (handleClick) and
+  // the drawing (drawControls). They used to be two independent sets of
+  // numbers that merely sat near each other -- the drawn cup was 50x98 while
+  // the clickable box was 54x130, the syrup shelf was 40x110 drawn against
+  // 44x115 clicked, and the serve control was clickable in a region with no
+  // art at all. Nothing tied them together, the unit tests cannot see art, and
+  // that is exactly how "clicking the tall cup does nothing" becomes possible.
+  struct Controls {
+    SDL_Rect serve;         // ORDER button, left sidebar (see controls.cpp)
+    SDL_Rect beanRegular;
+    SDL_Rect beanDecaf;
+    SDL_Rect milkWhole;
+    SDL_Rect milkNonfat;
+    SDL_Rect cupShort;
+    SDL_Rect cupTall;
+    SDL_Rect cupGrande;
+    SDL_Rect shot1;
+    SDL_Rect shot2;
+    SDL_Rect shot3;
+    SDL_Rect steamer;
+    std::vector<std::pair<std::string, SDL_Rect>> syrups;  // flavor -> rect
+  };
+  static const Controls& controls();
+
+  // Syrup bottle rectangles keyed by flavor name, for dev tooling that needs
+  // to aim at the real controls (the --script play mode) rather than keep its
+  // own copy of the coordinates.
+  static const std::vector<std::pair<std::string, SDL_Rect>>& syrupRects();
 
   void toggleFps() { showFps = !showFps; }
   void clearScores() { bestScore = 0; }
@@ -92,7 +118,6 @@ struct Game {
   void drawControls(SDL_Renderer* r);
   void drawHud(SDL_Renderer* r);
   SDL_Rect boardRect() const;
-  SDL_Rect serveRect() const;
   SDL_Rect headRect() const;
 };
 

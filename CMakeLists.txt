@@ -68,7 +68,7 @@ endif()
 # `expect` makes the script exit non-zero, which fails the test.
 find_package(PkgConfig REQUIRED)
 if(BUILD_TESTING)
-  foreach(script cups pause-guard full-shift)
+  foreach(script cups pause-guard serve-button full-shift)
     foreach(win 800x600 1024x768 1600x1200)
       if(win STREQUAL "800x600")
         set(suffix "")

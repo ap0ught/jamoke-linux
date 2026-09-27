@@ -32,14 +32,39 @@ counter, so faces never desync or repeat for different people. The angry
 feedback variant is `"<name>B"` — looked up in the index first; missing
 variants (e.g. `M_DudeHeadB`) are cleared and the base head is shown.
 
-## Build controls (`handleClick`, fixed 800x600 rects)
+## Build controls (`Game::controls`, one table for drawing and hit-testing)
 
-Right column: serve `{600,140,177,252}`. Left column (bean grinders, milk,
-shots, steam), flavor bottles row on the right, and the `NO SYRUP` reset all
-live in hardcoded rectangles (see the code near `handleClick`; `boardRect` /
-`serveRect` / `headRect` are `{20,10,300,126}`, `{600,140,177,252}`,
-`{470,130,120,120}`). Selection toggles: beans cycle decaf → split → regular;
-syrup tap-to-clear. Sounds (`grinder`, `pourmilk`, `steamer`, `cashreg`,
+Every clickable rectangle lives in a single static table, `Game::controls()`,
+and **both** `drawControls()` and `handleClick()` read it. They used to be two
+independent sets of numbers that merely sat near each other — the drawn cup was
+50x98 while the clickable box was 54x130, the syrup shelf 40x110 drawn against
+44x115 clicked, and the serve control was clickable in an empty region on the
+right. Nothing tied them together, and the unit tests cannot see art, which is
+how "clicking the tall cup does nothing" becomes possible at all.
+
+`GameLayout.*` in `tests/TestGame.cpp` locks the invariants: every rect is inside
+the 800x600 logical space, **no two controls overlap** (an overlap silently
+steals clicks, because `handleClick` tests in order and the earlier control
+wins), and `syrupRects()` matches `bottlesList()`.
+
+- **serve** `{0,254,198,98}` — the ORDER control, on the left sidebar. This is
+  the one rect *measured* rather than invented: the white arrow is baked into
+  `UIArt/Background.jpg` and its near-white pixels span x 1..195, y 256..350. It
+  needs no extra art; the background already draws it.
+- **beanRegular/beanDecaf** `{92,150,64,70}` / `{166,150,64,70}`
+- **milkWhole/milkNonfat** `{100,400,68,121}` / `{180,400,68,121}` — moved clear
+  of the ORDER button when the serve rect moved onto the sidebar. Their true
+  original position is still unverified (issue #1).
+- **cupShort/cupTall/cupGrande** `{624,500,46,80}` / `{676,482,50,98}` /
+  `{735,466,54,114}`
+- **shot1/shot2/shot3** `{285,230,110,80}` / `{400,230,110,80}` /
+  `{510,230,110,80}`
+- **steamer** `{592,133,32,32}` — shrunk onto its own indicator light.
+- **syrups** one per `bottlesList()` entry, `{x, y, 40, 110}`.
+
+`boardRect()` `{20,10,300,126}` and `headRect()` `{470,130,120,120}` are
+decorative and not clickable. Selection toggles: beans cycle decaf → split →
+regular; syrup tap-to-clear. Sounds (`grinder`, `pourmilk`, `steamer`, `cashreg`,
 `oops`) fire per interaction.
 
 ## Serve validation

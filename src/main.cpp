@@ -243,27 +243,33 @@ int main(int argc, char** argv) {
           if (!t) {
             std::fprintf(stderr, "build: no current target\n");
           } else {
+            // Aim every click at Game::controls(), the same table the game
+            // hit-tests, so a control can never be moved without the replay
+            // following it.
+            const Game::Controls& ctl = Game::controls();
+            auto centre = [](const SDL_Rect& r) {
+              return SDL_Point{r.x + r.w / 2, r.y + r.h / 2};
+            };
             std::vector<SDL_Point> clicks;
-            if (t->size == "tall") clicks.push_back({701, 531});
-            else if (t->size == "grande") clicks.push_back({757, 523});
-            else clicks.push_back({644, 535});
-            if (t->shots == 1) clicks.push_back({340, 270});
-            else if (t->shots == 2) clicks.push_back({455, 270});
-            else clicks.push_back({565, 270});
-            if (t->bean == "decaf") clicks.push_back({170, 185});
-            else if (t->bean == "split") clicks.push_back({170, 185});  // cycles
-            clicks.push_back(t->milk == "nonfat" ? SDL_Point{206, 310}
-                                                 : SDL_Point{124, 310});
+            clicks.push_back(centre(t->size == "tall"     ? ctl.cupTall
+                                    : t->size == "grande" ? ctl.cupGrande
+                                                          : ctl.cupShort));
+            clicks.push_back(centre(t->shots == 1 ? ctl.shot1
+                                    : t->shots == 2 ? ctl.shot2
+                                                    : ctl.shot3));
+            if (t->bean == "decaf" || t->bean == "split")
+              clicks.push_back(centre(ctl.beanDecaf));  // decaf cycles to split
+            clicks.push_back(centre(t->milk == "nonfat" ? ctl.milkNonfat
+                                                        : ctl.milkWhole));
             if (t->flavor != "none") {
-              for (const auto& kv : game.syrupRects()) {
+              for (const auto& kv : Game::syrupRects()) {
                 if (kv.first == t->flavor) {
-                  clicks.push_back({kv.second.x + kv.second.w / 2,
-                                    kv.second.y + kv.second.h / 2});
+                  clicks.push_back(centre(kv.second));
                   break;
                 }
               }
             }
-            if (t->type == "latte") clicks.push_back({610, 145});
+            if (t->type == "latte") clicks.push_back(centre(ctl.steamer));
             for (const SDL_Point& p : clicks) {
               SDL_Event e;
               SDL_zero(e);
@@ -278,13 +284,16 @@ int main(int argc, char** argv) {
             std::fflush(stdout);
           }
         } else if (c.op == "serve") {
+          // Aim at the real serve control rather than a hardcoded point, so
+          // moving the control cannot silently break every replay.
+          const SDL_Rect& sv = Game::controls().serve;
           SDL_Event e;
           SDL_zero(e);
           e.type = SDL_MOUSEBUTTONDOWN;
           e.button.button = SDL_BUTTON_LEFT;
           e.button.state = SDL_PRESSED;
-          e.button.x = input::toWindow(650, lw, ww);
-          e.button.y = input::toWindow(200, lh, wh);
+          e.button.x = input::toWindow(sv.x + sv.w / 2, lw, ww);
+          e.button.y = input::toWindow(sv.y + sv.h / 2, lh, wh);
           SDL_PushEvent(&e);
         } else if (c.op == "key") {
           SDL_Event e;

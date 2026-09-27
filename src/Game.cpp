@@ -256,11 +256,53 @@ void Game::serve() {
   }
 }
 
-std::vector<std::pair<std::string, SDL_Rect>> Game::syrupRects() const {
-  std::vector<std::pair<std::string, SDL_Rect>> out;
-  for (const auto& b : bottlesList())
-    out.emplace_back(b.name, SDL_Rect{b.x, b.y, 44, 115});
-  return out;
+const Game::Controls& Game::controls() {
+  // Single source of truth for the machine layout. drawControls() draws these
+  // rects and handleClick() hit-tests the same ones, so a control cannot be
+  // drawn in one place and clicked in another.
+  //
+  // The serve rect is the one measured from the original art rather than
+  // guessed: the white ORDER arrow is baked into UIArt/Background.jpg, and its
+  // near-white pixels span x 1..195, y 256..350. The remake draws that same
+  // background, so the control belongs on the left sidebar -- not floating in
+  // an empty region on the right where nothing was ever drawn.
+  static const Controls c = [] {
+    Controls t{
+      /*serve=*/{0, 254, 198, 98},
+      /*beanRegular=*/{92, 150, 64, 70},
+      /*beanDecaf=*/{166, 150, 64, 70},
+      /*milkWhole=*/{100, 400, 68, 121},
+      /*milkNonfat=*/{180, 400, 68, 121},
+      /*cupShort=*/{624, 500, 46, 80},
+      /*cupTall=*/{676, 482, 50, 98},
+      /*cupGrande=*/{735, 466, 54, 114},
+      /*shot1=*/{285, 230, 110, 80},
+      /*shot2=*/{400, 230, 110, 80},
+      /*shot3=*/{510, 230, 110, 80},
+      /*steamer=*/{592, 133, 32, 32},
+      /*syrups=*/{},
+    };
+    // Syrup hit boxes are the bottle positions from bottlesList(), so they can
+    // never drift from where the bottles are actually drawn.
+    for (const auto& b : bottlesList()) t.syrups.emplace_back(b.name, SDL_Rect{b.x, b.y, 40, 110});
+    return t;
+  }();
+  return c;
+}
+
+namespace {
+// The syrup rects are the bottle positions widened to the hit box, filled in
+// lazily because they derive from bottlesList().
+std::vector<std::pair<std::string, SDL_Rect>> syrupTable() {
+  std::vector<std::pair<std::string, SDL_Rect>> v;
+  for (const auto& b : bottlesList()) v.emplace_back(b.name, SDL_Rect{b.x, b.y, 40, 110});
+  return v;
+}
+}  // namespace
+
+const std::vector<std::pair<std::string, SDL_Rect>>& Game::syrupRects() {
+  static const std::vector<std::pair<std::string, SDL_Rect>> v = syrupTable();
+  return v;
 }
 
 void Game::handleClick(int x, int y) {
@@ -273,33 +315,22 @@ void Game::handleClick(int x, int y) {
   // mouse), so every hit test below is a hardcoded UI rectangle.
   auto box = [&](SDL_Rect r) { return inRect(r, x, y); };
 
-  // Serve.
-  if (box(serveRect())) { serve(); return; }
+  const Controls& c = controls();
 
-  // Grinder beans: two buttons under the board, left column.
-  if (box({92, 150, 64, 70})) { selectBean("regular"); a.play("sounds/grinder.wav"); return; }
-  if (box({166, 150, 64, 70})) { selectBean("decaf"); a.play("sounds/grinder.wav"); return; }
-
-  // Milk.
-  if (box({92, 250, 68, 121})) { selectMilk("whole"); a.play("sounds/pourmilk.wav"); return; }
-  if (box({172, 250, 68, 121})) { selectMilk("nonfat"); a.play("sounds/pourmilk.wav"); return; }
-
-  // Cup size stacks (right counter).
-  if (box({620, 480, 48, 110})) { selectSize("short"); a.play("sounds/cups.wav"); return; }
-  if (box({672, 460, 54, 130})) { selectSize("tall"); a.play("sounds/cups.wav"); return; }
-  if (box({730, 440, 60, 150})) { selectSize("grande"); a.play("sounds/cups.wav"); return; }
-
-  // Espresso machine spigots and shot cups on drip tray (1, 2, or 3 shots).
-  if (box({285, 230, 110, 80})) { shots = 1; a.play("sounds/grinder.wav"); return; }
-  if (box({400, 230, 110, 80})) { shots = 2; a.play("sounds/grinder.wav"); return; }
-  if (box({510, 230, 110, 80})) { shots = 3; a.play("sounds/grinder.wav"); return; }
-
-  // Steamer control on espresso machine.
-  if (box({580, 115, 60, 60})) { steamed = !steamed; a.play("sounds/steamer.wav"); return; }
-
-  // Flavor syrup bottles on the top shelf.
-  for (const auto& b : bottlesList()) {
-    if (box({b.x, b.y, 44, 115})) { selectFlavor(b.name); return; }
+  if (box(c.serve)) { serve(); return; }
+  if (box(c.beanRegular)) { selectBean("regular"); a.play("sounds/grinder.wav"); return; }
+  if (box(c.beanDecaf)) { selectBean("decaf"); a.play("sounds/grinder.wav"); return; }
+  if (box(c.milkWhole)) { selectMilk("whole"); a.play("sounds/pourmilk.wav"); return; }
+  if (box(c.milkNonfat)) { selectMilk("nonfat"); a.play("sounds/pourmilk.wav"); return; }
+  if (box(c.cupShort)) { selectSize("short"); a.play("sounds/cups.wav"); return; }
+  if (box(c.cupTall)) { selectSize("tall"); a.play("sounds/cups.wav"); return; }
+  if (box(c.cupGrande)) { selectSize("grande"); a.play("sounds/cups.wav"); return; }
+  if (box(c.shot1)) { shots = 1; a.play("sounds/grinder.wav"); return; }
+  if (box(c.shot2)) { shots = 2; a.play("sounds/grinder.wav"); return; }
+  if (box(c.shot3)) { shots = 3; a.play("sounds/grinder.wav"); return; }
+  if (box(c.steamer)) { steamed = !steamed; a.play("sounds/steamer.wav"); return; }
+  for (const auto& kv : c.syrups) {
+    if (box(kv.second)) { selectFlavor(kv.first); return; }
   }
 }
 
@@ -341,7 +372,6 @@ void Game::update(double dt) {
 }
 
 SDL_Rect Game::boardRect() const { return {20, 10, 300, 126}; }
-SDL_Rect Game::serveRect() const { return {610, 160, 170, 240}; }
 SDL_Rect Game::headRect() const { return {470, 130, 120, 120}; }
 
 void Game::drawBoard(SDL_Renderer* r) {
@@ -409,29 +439,38 @@ void Game::drawControls(SDL_Renderer* r) {
     }
   };
 
+  const Controls& c = controls();
+
+  // The ORDER button needs no extra blit: the white arrow is already baked
+  // into UIArt/Background.jpg, which this scene draws. OrderButton.bmp is the
+  // pressed-state sprite and is deliberately not drawn -- it is a 3-frame
+  // strip (177x252) that renders badly here, because its top-left pixel is
+  // near-white, so the corner-sniffing transparency key in Assets keys out the
+  // arrow itself and leaves the magenta field. See issue #9.
+
   // Bean grinders.
-  drawKeyRect("uiart/grinderbtn_reg.jpg", {92, 150, 64, 70}, bean == "regular");
-  drawKeyRect("uiart/grinderbtn_decaf.jpg", {166, 150, 64, 70},
+  drawKeyRect("uiart/grinderbtn_reg.jpg", c.beanRegular, bean == "regular");
+  drawKeyRect("uiart/grinderbtn_decaf.jpg", c.beanDecaf,
               bean == "decaf" || bean == "split");
   font::draw(r, "BEAN: " + cap(bean), 92, 228, 240, 240, 255, 1, 220);
 
   // Milk cartons.
-  drawKeyRect("uiart/milkcarton.bmp", {92, 250, 68, 121}, milk == "whole");
-  drawKeyRect("uiart/nfmilkcarton.bmp", {172, 250, 68, 121}, milk == "nonfat");
-  font::draw(r, "MILK " + cap(milk), 92, 378, 240, 240, 255, 1, 200);
+  drawKeyRect("uiart/milkcarton.bmp", c.milkWhole, milk == "whole");
+  drawKeyRect("uiart/nfmilkcarton.bmp", c.milkNonfat, milk == "nonfat");
+  font::draw(r, "MILK " + cap(milk), 100, 528, 240, 240, 255, 1, 200);
 
   // Cup size stacks on the right counter.
   int smW = a.texW("uiart/smcups.jpg"), smH = a.texH("uiart/smcups.jpg");
   SDL_Rect smSrc = {0, 0, smW, smH > 0 ? smH / 5 : smH};
-  drawKeyRect("uiart/smcups.jpg", {624, 500, 46, 80}, size == "short", smH > 0 ? &smSrc : nullptr);
+  drawKeyRect("uiart/smcups.jpg", c.cupShort, size == "short", smH > 0 ? &smSrc : nullptr);
 
   int medW = a.texW("uiart/medcups.jpg"), medH = a.texH("uiart/medcups.jpg");
   SDL_Rect medSrc = {0, 0, medW, medH > 0 ? medH / 5 : medH};
-  drawKeyRect("uiart/medcups.jpg", {676, 482, 50, 98}, size == "tall", medH > 0 ? &medSrc : nullptr);
+  drawKeyRect("uiart/medcups.jpg", c.cupTall, size == "tall", medH > 0 ? &medSrc : nullptr);
 
   int lgW = a.texW("uiart/lgcups.jpg"), lgH = a.texH("uiart/lgcups.jpg");
   SDL_Rect lgSrc = {0, 0, lgW, lgH > 0 ? lgH / 5 : lgH};
-  drawKeyRect("uiart/lgcups.jpg", {735, 466, 54, 114}, size == "grande", lgH > 0 ? &lgSrc : nullptr);
+  drawKeyRect("uiart/lgcups.jpg", c.cupGrande, size == "grande", lgH > 0 ? &lgSrc : nullptr);
 
   // Espresso machine spigots and shot cups on the drip tray.
   struct SpigotStation {
@@ -466,7 +505,7 @@ void Game::drawControls(SDL_Renderer* r) {
   int glW = a.texW("uiart/glight.bmp"), glH = a.texH("uiart/glight.bmp");
   SDL_Rect glSrc = {0, 0, glW, glH > 0 ? glH / 3 : glH};
   if (steamed) {
-    drawKeyRect("uiart/glight.bmp", {596, 131, 24, 24}, true, glH > 0 ? &glSrc : nullptr);
+    drawKeyRect("uiart/glight.bmp", c.steamer, true, glH > 0 ? &glSrc : nullptr);
   }
 
   // Flavor syrup bottles on top shelf across the carved Jamoke panel.
